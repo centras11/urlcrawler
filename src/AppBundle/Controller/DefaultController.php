@@ -27,15 +27,7 @@ class DefaultController extends Controller
      */
     public function crawlerAction($link, $search)
     {
-        // options to use curl with proxy
-        /*$options = array(
-            'CURLOPT_NOBODY'=> TRUE,
-            'CURLOPT_PROXY' => 'http://123.45.xxx.xxx',
-            'CURLOPT_PROXYPORT' => '9090',
-            'CURLOPT_PROXYUSERPWD' => 'dummyUsername:dummyPassword'
-        );*/
-
-        //$curl = $this->get('anchovy.curl')->setURL($link)->setOptions($options)->execute();
+        $curl = $this->getCurl($link);
 
         $curl = $this->get('anchovy.curl')->setURL($link)->execute();
 
@@ -58,6 +50,7 @@ class DefaultController extends Controller
 
         foreach ($search as $value) {
             $link = $crawler->selectLink($value);
+            //$link = $crawler->filter('a:contains("Greet")')->eq(1)->link();
 
             if (count($link) != 0) {
                  $links[] = $link->link()->getUri();
@@ -65,6 +58,40 @@ class DefaultController extends Controller
         }
 
         $data['links'] = $links;
+
+
+        return new JsonResponse($data);
+    }
+
+    /**
+     * @param string $rule
+     * @param string $link
+     *
+     * @Route("/app/crawler-by-rule/{rule}/{link}", defaults={"link" = "http://12handyorten.com/", "rule" = "email"}, name="_crawler_by_rule", requirements={"link"=".+"})
+     *
+     * @return JsonResponse
+     */
+    public function crawlerByRuleAction($rule, $link)
+    {
+        $curl = $this->getCurl($link);
+
+        switch ($rule) {
+            case 'email':
+                $rule = '/([\s]*)([_a-zA-Z0-9-]+(\.[_a-zA-Z0-9-]+)*([ ]+|)@([ ]+|)([a-zA-Z0-9-]+\.)+([a-zA-Z]{2,}))([\s]*)/i';
+                break;
+            case 'phone':
+                $rule = '/[8] [0-9]{3} [0-9]{2} [0-9]{3}/';
+                break;
+        }
+
+        $data = [];
+        $match = preg_match_all($rule, $curl, $matches);
+
+        if ($match) {
+            foreach($matches[0] as $emails) {
+                $data['matches'][] = $emails;
+            }
+        }
 
         return new JsonResponse($data);
     }
@@ -78,5 +105,27 @@ class DefaultController extends Controller
     private function filterHTag($hTag, Crawler $crawler)
     {
         return $crawler->filter($hTag)->extract(['_text']);
+    }
+
+    /**
+     * @param string  $link
+     * @param boolean $useProxy
+     *
+     * @return mixed
+     */
+    private function getCurl($link, $useProxy = false)
+    {
+        $options = [];
+
+        if ($useProxy) {
+            $options = [
+                'CURLOPT_NOBODY'=> TRUE,
+                'CURLOPT_PROXY' => 'http://123.45.xxx.xxx',
+                'CURLOPT_PROXYPORT' => '9090',
+                'CURLOPT_PROXYUSERPWD' => 'dummyUsername:dummyPassword'
+            ];
+        }
+
+        return $this->get('anchovy.curl')->setURL($link)->setOptions($options)->execute();
     }
 }
