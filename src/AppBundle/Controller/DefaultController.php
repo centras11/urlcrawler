@@ -29,8 +29,6 @@ class DefaultController extends Controller
     {
         $curl = $this->getCurl($link);
 
-        $curl = $this->get('anchovy.curl')->setURL($link)->execute();
-
         $crawler = new Crawler($curl, $link);
 
         $data = [];
