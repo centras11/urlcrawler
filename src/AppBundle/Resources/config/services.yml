@@ -1,0 +1,14 @@
+parameters:
+    crawler.service.crawler_manager.class: AppBundle\Service\CrawlerManager
+    crawler.email_regex_rule: /([\s]*)([_a-zA-Z0-9-]+(\.[_a-zA-Z0-9-]+)*([ ]+|)@([ ]+|)([a-zA-Z0-9-]+\.)+([a-zA-Z]{2,}))([\s]*)/i
+    crawler.phone_regex_rule: /\+43 \(0\) [0-9]{1} [0-9]{3} [0-9]{2} [0-9]{2}/
+#    crawler.phone_regex_rule: /[8] [0-9]{3} [0-9]{2} [0-9]{3}/
+    crawler.search_link_names:
+                      - Impressum
+                      - Kontakt
+                      - Kontaktai
+
+services:
+    crawler.service.crawler_manager:
+        class: %crawler.service.crawler_manager.class%
+        arguments: ["@anchovy.curl", "%crawler.email_regex_rule%", "%crawler.phone_regex_rule%"]
