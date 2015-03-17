@@ -10,24 +10,15 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 class DefaultController extends Controller
 {
     /**
-     * @Route("/app/example", name="homepage")
-     */
-    public function indexAction()
-    {
-        return $this->render('default/index.html.twig');
-    }
-
-    /**
      * @param string $link
-     * @param string $search
      *
-     * @Route("/app/crawler/{link}/{search}", defaults={"link" = "http://12handyorten.com/", "search" = "Impressum;Kontakt"}, name="_crawler", requirements={"link"=".+"})
+     * @Route("/app/crawler/{link}", defaults={"link" = "http://12handyorten.com/"}, name="_crawler", requirements={"link"=".+"})
      *
      * @return JsonResponse
      */
-    public function crawlerAction($link, $search)
+    public function crawlerAction($link)
     {
-        $curl = $this->getCurl($link);
+        $curl = $this->getCrawlerManager()->getCurl($link);
 
         $crawler = new Crawler($curl, $link);
 
@@ -39,11 +30,11 @@ class DefaultController extends Controller
             ->extract(array('name', 'content'))
         ;
 
-        $data['h1'] = $this->filterHTag('h1', $crawler);
-        $data['h2'] = $this->filterHTag('h2', $crawler);
-        $data['h3'] = $this->filterHTag('h3', $crawler);
+        $data['h1'] = $this->getCrawlerManager()->filterHTag('h1', $crawler);
+        $data['h2'] = $this->getCrawlerManager()->filterHTag('h2', $crawler);
+        $data['h3'] = $this->getCrawlerManager()->filterHTag('h3', $crawler);
 
-        $search = explode(';', $search);
+        $search = $this->container->getParameter('crawler.search_link_names');
         $links = [];
 
         foreach ($search as $value) {
@@ -57,10 +48,20 @@ class DefaultController extends Controller
 
         $data['links'] = $links;
 
+        $emails = $phones = [];
+
+        foreach ($links as $link) {
+            $emails = array_merge($emails, $this->getCrawlerManager()->crawlerByRule('email', $link));
+            $phones = array_merge($phones, $this->getCrawlerManager()->crawlerByRule('phone', $link));
+        }
+
+        $data['emails'] = array_unique($emails);
+        $data['phones'] = array_unique($phones);
 
         return new JsonResponse($data);
     }
 
+    // http://localhost/crawler/web/app_dev.php/app/crawler-by-rule/email/http://www.impuls.lt/kontaktai/
     /**
      * @param string $rule
      * @param string $link
@@ -71,7 +72,7 @@ class DefaultController extends Controller
      */
     public function crawlerByRuleAction($rule, $link)
     {
-        $curl = $this->getCurl($link);
+        $curl = $this->getCrawlerManager()->getCurl($link);
 
         switch ($rule) {
             case 'email':
@@ -95,35 +96,10 @@ class DefaultController extends Controller
     }
 
     /**
-     * @param string $hTag
-     * @param Crawler $crawler
-     *
-     * @return array
+     * @return \AppBundle\Service\CrawlerManager
      */
-    private function filterHTag($hTag, Crawler $crawler)
+    protected function getCrawlerManager()
     {
-        return $crawler->filter($hTag)->extract(['_text']);
-    }
-
-    /**
-     * @param string  $link
-     * @param boolean $useProxy
-     *
-     * @return mixed
-     */
-    private function getCurl($link, $useProxy = false)
-    {
-        $options = [];
-
-        if ($useProxy) {
-            $options = [
-                'CURLOPT_NOBODY'=> TRUE,
-                'CURLOPT_PROXY' => 'http://123.45.xxx.xxx',
-                'CURLOPT_PROXYPORT' => '9090',
-                'CURLOPT_PROXYUSERPWD' => 'dummyUsername:dummyPassword'
-            ];
-        }
-
-        return $this->get('anchovy.curl')->setURL($link)->setOptions($options)->execute();
+        return $this->get('crawler.service.crawler_manager');
     }
 }
